@@ -5,10 +5,23 @@
 #include <stdlib.h>
 
 struct termios orig_termios;
+
+// Most C library functions that fail will set the global errno variable to indicate what the error was. 
+// perror() looks at the global errno variable and prints a descriptive error message for it. 
+// It also prints the string given to it before it prints the error message, 
+// which is meant to provide context about what part of your code caused the error.
+void die(const char *s) {
+    perror(s);
+    exit(1);
+}
+
 void disableRawMode() {
     // online course use TCASFLUSH here
-    // currently i cannot tell the difference here
-    tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
+    // currently I cannot tell the difference here
+    if(tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios) == -1) {
+        die("tcsetattr");
+    }
+     
 }
 
 void enableRawMode() {
@@ -16,7 +29,11 @@ void enableRawMode() {
     // i want to turn off echo of the screen, why read STDIN_FILENO
     // Explanation: echo is an attribute of the keyboard,
     //              because first keyboard send, then screen shows.
-    tcgetattr(STDIN_FILENO, &orig_termios);
+    ////////
+    // QUESTION HERE!!!!!!
+    // if we use pipe or file as the standard input here
+    // tcgetattr would die, why
+    if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
 
     struct termios raw = orig_termios;
     atexit(disableRawMode);
@@ -53,7 +70,7 @@ void enableRawMode() {
     // ??????????????????????       QUESTION HERE
     // according to POSIX standard or POSIX program guide
     // I cannot tell the use of IXON bit very clearly
-    raw.c_iflag &= ~(IXON | ICRNL);
+    raw.c_iflag &= ~~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
 
     // ICRNL makes all "\r"(including ctrl+m and Enter) into "\n"
     // and then, "\n" are translated into "\r\n" by default
@@ -62,21 +79,32 @@ void enableRawMode() {
     // is likely the only output processing feature by default
     raw.c_oflag &= ~(OPOST);
 
+    raw.c_cflag |= (CS8);
+
+    // VMIN decides the minimum characters read must get before return
+    // VTIME decides the minimum time before read return
+    // when VMIN && VTIME is true, then read could return
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 10;
+
     // online course use TCASFLUSH here
     // currently i cannot tell the difference here
-    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    if(tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) die("tcsetattr");
 }
 
 int main(void){
     enableRawMode();
 
-    char c;
-    while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
+    while (1) {
+        char c = '\0';
+        if(read(STDIN_FILENO, &c, 1) == -1) die("read");
         if (iscntrl(c)) {
             printf("%d\r\n", c);
         } else {
             printf("%d ('%c')\r\n", c, c);
         }
+
+        if(c == 'q') break;
     }
     return 0;
 }
