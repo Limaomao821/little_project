@@ -2,7 +2,13 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <termios.h>
+#include <errno.h>
 #include <stdlib.h>
+
+// This mirrors what the Ctrl key does in the terminal: 
+// it strips bits 5 and 6 from whatever key you press in combination with Ctrl, 
+// and sends that.
+# define CTRL_KEY(k) (k & 0x1f)
 
 struct termios orig_termios;
 
@@ -70,7 +76,7 @@ void enableRawMode() {
     // ??????????????????????       QUESTION HERE
     // according to POSIX standard or POSIX program guide
     // I cannot tell the use of IXON bit very clearly
-    raw.c_iflag &= ~~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
 
     // ICRNL makes all "\r"(including ctrl+m and Enter) into "\n"
     // and then, "\n" are translated into "\r\n" by default
@@ -92,19 +98,39 @@ void enableRawMode() {
     if(tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) die("tcsetattr");
 }
 
+void editorRefreshScreen() {
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+}
+char editorReadKey() {
+    int nread;
+    char c;
+
+    // I am not very clear about the conditions here
+    while((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+        if(nread == -1 && errno != EAGAIN) die("read");
+    }
+    return c;
+}
+
+void editorProcessKeypress() {
+    char c = editorReadKey();
+
+    switch (c)
+    {
+    case(CTRL_KEY('q')):
+        exit(0);
+        break;
+    
+    default:
+        break;
+    }
+}
 int main(void){
     enableRawMode();
 
     while (1) {
-        char c = '\0';
-        if(read(STDIN_FILENO, &c, 1) == -1) die("read");
-        if (iscntrl(c)) {
-            printf("%d\r\n", c);
-        } else {
-            printf("%d ('%c')\r\n", c, c);
-        }
-
-        if(c == 'q') break;
+        editorRefreshScreen();
+        editorProcessKeypress();
     }
     return 0;
 }
