@@ -107,6 +107,10 @@ char editorReadKey() {
 
     // I am not very clear about the conditions here
     while((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+        // QUESTION HERE??????
+        // I suppose EAGAIN could never occur in blocking IO
+        // read() here is a blocking IO
+        // why the need to check it
         if(nread == -1 && errno != EAGAIN) die("read");
     }
     return c;
