@@ -10,7 +10,10 @@
 // and sends that.
 # define CTRL_KEY(k) (k & 0x1f)
 
-struct termios orig_termios;
+struct editorConfig {
+    struct termios orig_termios;
+};
+struct editorConfig E;
 
 // Most C library functions that fail will set the global errno variable to indicate what the error was. 
 // perror() looks at the global errno variable and prints a descriptive error message for it. 
@@ -27,7 +30,7 @@ void die(const char *s) {
 void disableRawMode() {
     // online course use TCASFLUSH here
     // currently I cannot tell the difference here
-    if(tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios) == -1) {
+    if(tcsetattr(STDIN_FILENO, TCSANOW, &E.orig_termios) == -1) {
         die("tcsetattr");
     }
      
@@ -42,9 +45,9 @@ void enableRawMode() {
     // QUESTION HERE!!!!!!
     // if we use pipe or file as the standard input here
     // tcgetattr would die, why
-    if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
+    if(tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
 
-    struct termios raw = orig_termios;
+    struct termios raw = E.orig_termios;
     atexit(disableRawMode);
 
     // Flipping bits like this is common in C.
@@ -149,7 +152,7 @@ void editorProcessKeypress() {
 int main(void){
     enableRawMode();
     editorRefreshScreen();
-    
+
     while (1) {
         editorProcessKeypress();
     }
