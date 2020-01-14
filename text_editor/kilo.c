@@ -17,6 +17,9 @@ struct termios orig_termios;
 // It also prints the string given to it before it prints the error message, 
 // which is meant to provide context about what part of your code caused the error.
 void die(const char *s) {
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
+
     perror(s);
     exit(1);
 }
@@ -97,10 +100,21 @@ void enableRawMode() {
     // currently i cannot tell the difference here
     if(tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) die("tcsetattr");
 }
-
+void editorDrawRows() {
+    int col;
+    for(col=0; col<24; ++col) {
+        write(STDOUT_FILENO, "~\r\n", 3);
+    }
+}
 void editorRefreshScreen() {
     write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
+
+    editorDrawRows();
+
+    write(STDOUT_FILENO, "\x1b[H", 3);
 }
+
 char editorReadKey() {
     int nread;
     char c;
@@ -122,6 +136,9 @@ void editorProcessKeypress() {
     switch (c)
     {
     case(CTRL_KEY('q')):
+        write(STDOUT_FILENO, "\x1b[2J", 4);
+        write(STDOUT_FILENO, "\x1b[H", 3);
+
         exit(0);
         break;
     
@@ -131,9 +148,9 @@ void editorProcessKeypress() {
 }
 int main(void){
     enableRawMode();
-
+    editorRefreshScreen();
+    
     while (1) {
-        editorRefreshScreen();
         editorProcessKeypress();
     }
     return 0;
