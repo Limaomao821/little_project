@@ -123,12 +123,29 @@ char editorReadKey() {
     }
     return c;
 }
+int getCursorPosition(int *rows, int *cols) {
+    if(write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
 
+    char store[32];
+    int i;
+    for(i=0; i<32; ++i) {
+        if(read(STDIN_FILENO, store+i, 1) != 1) return -1;
+        if(store[i] == 'R') break;
+    }
+
+    ++i;
+    store[i] = '\0';
+
+    if(store[0] != '\x1b'|| store[1] != '[') return -1;
+    if(sscanf(&store[2], "%d;%d", rows, cols) != 2) return -1;
+
+    return 1;
+}
 int getWindowSize(int *rows, int *cols) {
     struct winsize size;
     if(ioctl(STDIN_FILENO, TIOCGWINSZ, (char *) &size) == -1 || size.ws_row == 0) {
-        perror("TIOCGWINSZ error");
-        return -1; 
+        if(write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+        return getCursorPosition(rows, cols);
     } else {
         *rows = size.ws_row;
         *cols = size.ws_col;    
