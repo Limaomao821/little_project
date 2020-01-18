@@ -4,6 +4,7 @@
 #include <termios.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 
 // This mirrors what the Ctrl key does in the terminal: 
 // it strips bits 5 and 6 from whatever key you press in combination with Ctrl, 
@@ -12,8 +13,12 @@
 
 struct editorConfig {
     struct termios orig_termios;
+    int screenrows;
+    int screencols;
 };
 struct editorConfig E;
+
+/*** terminal ***/
 
 // Most C library functions that fail will set the global errno variable to indicate what the error was. 
 // perror() looks at the global errno variable and prints a descriptive error message for it. 
@@ -103,20 +108,6 @@ void enableRawMode() {
     // currently i cannot tell the difference here
     if(tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) die("tcsetattr");
 }
-void editorDrawRows() {
-    int col;
-    for(col=0; col<24; ++col) {
-        write(STDOUT_FILENO, "~\r\n", 3);
-    }
-}
-void editorRefreshScreen() {
-    write(STDOUT_FILENO, "\x1b[2J", 4);
-    write(STDOUT_FILENO, "\x1b[H", 3);
-
-    editorDrawRows();
-
-    write(STDOUT_FILENO, "\x1b[H", 3);
-}
 
 char editorReadKey() {
     int nread;
@@ -132,6 +123,35 @@ char editorReadKey() {
     }
     return c;
 }
+
+int getWindowSize(int *rows, int *cols) {
+    struct winsize size;
+    if(ioctl(STDIN_FILENO, TIOCGWINSZ, (char *) &size) == -1 || size.ws_row == 0) {
+        perror("TIOCGWINSZ error");
+        return -1; 
+    } else {
+        *rows = size.ws_row;
+        *cols = size.ws_col;    
+        return 0;
+    }
+}
+
+void editorDrawRows() {
+    int col;
+    for(col=0; col<E.screenrows; ++col) {
+        write(STDOUT_FILENO, "~\r\n", 3);
+    }
+}
+void editorRefreshScreen() {
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
+
+    editorDrawRows();
+
+    write(STDOUT_FILENO, "\x1b[H", 3);
+}
+
+
 
 void editorProcessKeypress() {
     char c = editorReadKey();
@@ -149,8 +169,14 @@ void editorProcessKeypress() {
         break;
     }
 }
+
+/*** init ***/
+void initEditor() {
+    if(getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+}
 int main(void){
     enableRawMode();
+    initEditor();
     editorRefreshScreen();
 
     while (1) {
