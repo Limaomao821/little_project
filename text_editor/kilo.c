@@ -10,7 +10,6 @@
 // it strips bits 5 and 6 from whatever key you press in combination with Ctrl, 
 // and sends that.
 # define CTRL_KEY(k) (k & 0x1f)
-
 struct editorConfig {
     struct termios orig_termios;
     int screenrows;
@@ -108,7 +107,6 @@ void enableRawMode() {
     // currently i cannot tell the difference here
     if(tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) die("tcsetattr");
 }
-
 char editorReadKey() {
     int nread;
     char c;
@@ -155,9 +153,10 @@ int getWindowSize(int *rows, int *cols) {
 
 void editorDrawRows() {
     int col;
-    for(col=0; col<E.screenrows; ++col) {
+    for(col=0; col<E.screenrows-1; ++col) {
         write(STDOUT_FILENO, "~\r\n", 3);
     }
+    write(STDOUT_FILENO, "~", 1);
 }
 void editorRefreshScreen() {
     write(STDOUT_FILENO, "\x1b[2J", 4);
@@ -185,6 +184,25 @@ void editorProcessKeypress() {
     default:
         break;
     }
+}
+/*** append buffer ***/
+struct abuf {
+    char *b;
+    int len;
+}
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+
+    if(new == NULL) return;
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
+}
+
+void abFree(struct abuf *ab) {
+    free(ab->b);
 }
 
 /*** init ***/
